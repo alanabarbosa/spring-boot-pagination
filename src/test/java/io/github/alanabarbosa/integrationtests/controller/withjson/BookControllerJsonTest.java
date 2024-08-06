@@ -26,6 +26,7 @@ import io.github.alanabarbosa.integrationtests.testcontainers.AbstractIntegratio
 import io.github.alanabarbosa.integrationtests.vo.AccountCredentialsVO;
 import io.github.alanabarbosa.integrationtests.vo.BookVO;
 import io.github.alanabarbosa.integrationtests.vo.TokenVO;
+import io.github.alanabarbosa.integrationtests.vo.wrappers.WrapperBookVO;
 import io.restassured.builder.RequestSpecBuilder;
 import io.restassured.filter.log.LogDetail;
 import io.restassured.filter.log.RequestLoggingFilter;
@@ -195,29 +196,60 @@ public class BookControllerJsonTest extends AbstractIntegrationTest{
                     .body()
                 .asString();
         
-        List<BookVO> books = objectMapper.readValue(content, new TypeReference<List<BookVO>>() {});
+		WrapperBookVO wrapper = objectMapper.readValue(content, WrapperBookVO.class);
+		var book = wrapper.getEmbedded().getBooks();
 		
-        BookVO foundBookOne = books.get(0);
+        BookVO foundBookOne = book.get(0);
+        
         assertNotNull(foundBookOne.getId());
         assertNotNull(foundBookOne.getTitle());
         assertNotNull(foundBookOne.getAuthor());
         assertNotNull(foundBookOne.getPrice());
         assertTrue(foundBookOne.getId() > 0);
-        assertEquals("Working effectively with legacy code", foundBookOne.getTitle());
-        assertEquals("Michael C. Feathers", foundBookOne.getAuthor());
-        assertEquals(49.00, foundBookOne.getPrice());
+        assertEquals("About Face", foundBookOne.getTitle());
+        assertEquals("Alan Cooper", foundBookOne.getAuthor());
+        assertEquals(90.0, foundBookOne.getPrice());
         
-        BookVO foundBookFive = books.get(4);
+        BookVO foundBookFive = book.get(4);
         
         assertNotNull(foundBookFive.getId());
         assertNotNull(foundBookFive.getTitle());
         assertNotNull(foundBookFive.getAuthor());
         assertNotNull(foundBookFive.getPrice());
         assertTrue(foundBookFive.getId() > 0);
-        assertEquals("Code complete", foundBookFive.getTitle());
-        assertEquals("Steve McConnell", foundBookFive.getAuthor());
-        assertEquals(58.0, foundBookFive.getPrice());
+        assertEquals("Clean Architecture", foundBookFive.getTitle());
+        assertEquals("Robert C. Martin", foundBookFive.getAuthor());
+        assertEquals(55.0, foundBookFive.getPrice());
 	}
+	
+	@Test
+	@Order(6)
+	public void testHATEOAS() throws JsonMappingException, JsonProcessingException {
+		
+        var content = given().spec(specification)
+                .contentType(TestConfigs.CONTENT_TYPE_JSON)
+                    .queryParams("page", 0 , "limit", 5, "direction", "asc")
+                    .when()
+                    .get()
+                .then()
+                    .statusCode(200)
+                .extract()
+                    .body()
+                .asString();		
+		
+		assertTrue(content.contains("\"_links\":{\"self\":{\"href\":\"http://localhost:8888/api/book/v1/56\"}}}"));
+		assertTrue(content.contains("\"_links\":{\"self\":{\"href\":\"http://localhost:8888/api/book/v1/25\"}}}"));
+		assertTrue(content.contains("\"_links\":{\"self\":{\"href\":\"http://localhost:8888/api/book/v1/12\"}}}"));
+		assertTrue(content.contains("\"_links\":{\"self\":{\"href\":\"http://localhost:8888/api/book/v1/62\"}}}"));
+		
+		assertTrue(content.contains("{\"first\":{\"href\":\"http://localhost:8888/api/book/v1?direction=asc&page=0&size=12&sort=title,asc\"}"));
+		//assertTrue(content.contains("\"prev\":{\"href\":\"http://localhost:8888/api/book/v1?direction=asc&page=2&size=12&sort=title,asc\"}"));
+		assertTrue(content.contains("\"self\":{\"href\":\"http://localhost:8888/api/book/v1?page=0&size=12&direction=asc\"}"));
+		assertTrue(content.contains("\"next\":{\"href\":\"http://localhost:8888/api/book/v1?direction=asc&page=1&size=12&sort=title,asc\"}"));
+		assertTrue(content.contains("\"last\":{\"href\":\"http://localhost:8888/api/book/v1?direction=asc&page=6&size=12&sort=title,asc\"}}"));
+	
+		assertTrue(content.contains("\"page\":{\"size\":12,\"totalElements\":73,\"totalPages\":7,\"number\":0}}"));
+	}	
 	
 
 	private void mockBook() {
